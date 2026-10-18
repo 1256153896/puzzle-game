@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>拼图小游戏 H5</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at 20% 20%, #3b1d5e 0%, #0f172a 55%, #090d16 100%);
+      color: #f8fafc;
+      overflow: hidden;
+    }
+
+    /* 背景装饰光晕 */
+    .bg-glow {
+      position: fixed;
+      width: 360px;
+      height: 360px;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.45;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .glow-1 { top: -80px; left: -80px; background: #6366f1; }
+    .glow-2 { bottom: -80px; right: -80px; background: #38bdf8; }
+
+    /* 游戏主容器 */
+    .game-container {
+      width: 760px;
+      height: 480px;
+      background: rgba(30, 41, 59, 0.65);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 24px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      z-index: 1;
+    }
+
+    .page {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .page.active {
+      display: flex;
+    }
+
+    /* 1. 封面页 */
+    .title {
+      font-size: 38px;
+      font-weight: 800;
+      margin: 0 0 18px 0;
+      background: linear-gradient(90deg, #fff, #93c5fd, #c4b5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 2px;
+    }
+    .cover-preview {
+      width: 140px;
+      height: 172px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 2px solid rgba(56, 189, 248, 0.6);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+      margin-bottom: 24px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1 0%, #38bdf8 100%);
+      color: #fff;
+      font-size: 20px;
+      font-weight: 600;
+      padding: 10px 44px;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(56, 189, 248, 0.35);
+      margin-bottom: 18px;
+      transition: transform 0.15s;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+    }
+    .btn-primary:active {
+      transform: scale(0.96);
+    }
+    .cover-tip {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    /* 2. 拼图页 */
+    .top-bar {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+      margin-bottom: 12px;
+      z-index: 5;
+    }
+    .stat-pill {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 6px 18px;
+      border-radius: 999px;
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stat-pill span {
+      color: #38bdf8;
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .stat-pill.timer-pill span {
+      color: #f43f5e;
+    }
+
+    .board-wrapper {
+      width: 100%;
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding-left: 45px;
+    }
+
+    /* 左侧 2x2 目标四等分网格 */
+    .target-grid {
+      width: 260px;
+      height: 320px;
+      background: rgba(15, 23, 42, 0.55);
+      border: 2px solid rgba(148, 163, 184, 0.35);
+      border-radius: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      overflow: hidden;
+      position: relative;
+    }
+    .target-slot {
+      border: 1px dashed rgba(148, 163, 184, 0.25);
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 26px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.1);
+    }
+
+    /* 右侧散落托盘提示区 */
+    .tray-zone {
+      position: absolute;
+      right: 40px;
+      top: 10px;
+      width: 340px;
+      height: 320px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 10px;
+      pointer-events: none;
+    }
+    .drag-tip {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    /* 四等分拼图块 */
+    .puzzle-piece {
+      width: 130px;
+      height: 160px;
+      position: absolute;
+      cursor: grab;
+      background-size: 200% 200%;
+      background-repeat: no-repeat;
+      border-radius: 6px;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      z-index: 10;
+      touch-action: none;
+    }
+    .puzzle-piece.dragging {
+      cursor: grabbing;
+      transform: scale(1.04);
+      border-color: #38bdf8;
+    }
+    .puzzle-piece.locked {
+      cursor: default;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+      z-index: 5;
+      pointer-events: none;
+      transition: left 0.15s ease, top 0.15s ease;
+    }
+
+    /* 3. 成功页与 4. 失败页 */
+    .complete-img {
+      width: 210px;
+      height: 258px;
+      object-fit: cover;
+      border-radius: 14px;
+      border: 2px solid #38bdf8;
+      box-shadow: 0 10px 30px rgba(56, 189, 248, 0.3);
+      margin-bottom: 14px;
+    }
+    .result-text {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-glow glow-1"></div>
+<div class="bg-glow glow-2"></div>
+<input type="file" id="fileInput" accept="image/*" style="display: none;">
+
+<div class="game-container" id="gameContainer">
+  <!-- 1. 封面页 -->
+  <div class="page active" id="pageCover">
+    <h1 class="title">拼图小游戏</h1>
+    <img id="coverImg" class="cover-preview" alt="预览图" onclick="document.getElementById('fileInput').click()">
+    <button class="btn-primary" onclick="startGame()">开始</button>
+    <div class="cover-tip">点击“开始”按钮进入拼图界面，并开始计时</div>
+  </div>
+
+  <!-- 2. 拼图页 -->
+  <div class="page" id="pagePuzzle">
+    <div class="top-bar">
+      <div class="stat-pill">已拼合进度 <span id="scoreDisplay">0</span> / 4</div>
+      <div class="stat-pill timer-pill">倒计时 <span id="timeDisplay">10</span>s</div>
+    </div>
+
+    <div class="board-wrapper" id="puzzleArea">
+      <div class="target-grid" id="targetGrid">
+        <div class="target-slot" data-index="0">1</div>
+        <div class="target-slot" data-index="1">2</div>
+        <div class="target-slot" data-index="2">3</div>
+        <div class="target-slot" data-index="3">4</div>
+      </div>
+
+      <div class="tray-zone">
+        <div class="drag-tip">拖动图块到左边相应位置上</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 成功页 -->
+  <div class="page" id="pageSuccess">
+    <img id="successImg" class="complete-img" alt="完整拼图">
+    <div class="result-text">🎉 拼图成功</div>
+    <button class="btn-primary" onclick="startGame()">再玩一次</button>
+  </div>
+
+  <!-- 4. 失败页 -->
+  <div class="page" id="pageFail">
+    <div class="result-text" style="margin-bottom: 36px;">⏰ 超时结束游戏</div>
+    <button class="btn-primary" onclick="startGame()">再玩一次</button>
+  </div>
+</div>
+
+<script>
+  // 内置画面兜底
+  const FALLBACK_SVG = `data:image/svg+xml;utf8,` + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 980">
+      <rect width="800" height="980" fill="#f5f7fb"/>
+      <rect width="800" height="45" fill="#050505"/>
+      <rect y="935" width="800" height="45" fill="#050505"/>
+      <rect y="730" width="800" height="205" fill="#dcd4c8"/>
+      <polygon points="0,150 48,192 48,370 0,330" fill="#7c7ce0"/>
+      <polygon points="0,330 465,730 345,730 0,435" fill="#9bd0f2"/>
+      <path d="M325,840 L345,840 L355,930 L275,930 Q285,900 315,885 Z" fill="#1e2229"/>
+      <path d="M655,840 L678,840 L720,930 L650,930 Z" fill="#1e2229"/>
+      <path d="M440,545 L585,555 L635,665 L680,850 L645,855 L585,700 L505,635 L370,715 L350,850 L315,845 L320,695 L425,585 Z" fill="#928e8b" stroke="#75716e" stroke-width="3"/>
+      <path d="M460,340 Q535,320 605,390 L635,515 L610,590 L585,560 L440,550 L375,455 L425,365 Z" fill="#121722"/>
+      <circle cx="595" cy="345" r="42" fill="#d8a898"/>
+      <path d="M545,320 Q585,285 645,315 Q665,350 640,380 Q610,345 560,355 Z" fill="#3a3537"/>
+      <path d="M498,335 L532,445 L515,450 L482,340 Z" fill="#f0f2f5"/>
+      <path d="M532,445 L580,480 L575,495 L525,455 Z" fill="#e2e5ea"/>
+      <rect x="512" y="455" width="16" height="105" rx="4" fill="#f0f2f5"/>
+      <rect x="515" y="555" width="10" height="22" fill="#6e473b"/>
+    </svg>
+  `);
+
+  let currentImageUrl = FALLBACK_SVG;
+  let score = 0;
+  let timeLeft = 10;
+  let timer = null;
+
+  const piecesConfig = [
+    { index: 0, bgPos: '0% 0%' },
+    { index: 1, bgPos: '100% 0%' },
+    { index: 2, bgPos: '0% 100%' },
+    { index: 3, bgPos: '100% 100%' }
+  ];
+
+  function applyImage(url) {
+    const testImg = new Image();
+    testImg.onload = () => {
+      currentImageUrl = url;
+      document.getElementById('coverImg').src = url;
+      document.getElementById('successImg').src = url;
+
+      const ratio = testImg.naturalWidth / testImg.naturalHeight;
+      const gridHeight = 320;
+      const gridWidth = Math.round(gridHeight * ratio);
+      const grid = document.getElementById('targetGrid');
+      grid.style.width = gridWidth + 'px';
+      grid.style.height = gridHeight + 'px';
+
+      document.querySelectorAll('.puzzle-piece').forEach(piece => {
+        piece.style.backgroundImage = `url("${url}")`;
+      });
+    };
+    testImg.src = url;
+  }
+
+  // 默认加载并自动检测同目录下的原图文件
+  applyImage(FALLBACK_SVG);
+  ['1792312487305_2.png', '1792312487305.png'].forEach(fileName => {
+    const localProbe = new Image();
+    localProbe.onload = () => applyImage(fileName);
+    localProbe.src = fileName;
+  });
+
+  // 支持点击封面预览图或直接拖入图片静默替换
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) applyImage(URL.createObjectURL(file));
+  });
+
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        applyImage(URL.createObjectURL(file));
+      }
+    }
+  });
+
+  function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+  }
+
+  function startGame() {
+    clearInterval(timer);
+    score = 0;
+    timeLeft = 10;
+    document.getElementById('scoreDisplay').innerText = score;
+    document.getElementById('timeDisplay').innerText = timeLeft;
+
+    showPage('pagePuzzle');
+    initPieces();
+
+    timer = setInterval(() => {
+      timeLeft--;
+      document.getElementById('timeDisplay').innerText = timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        showPage('pageFail');
+      }
+    }, 1000);
+  }
+
+  function initPieces() {
+    const puzzleArea = document.getElementById('puzzleArea');
+    const grid = document.getElementById('targetGrid');
+    puzzleArea.querySelectorAll('.puzzle-piece').forEach(el => el.remove());
+
+    const pieceWidth = grid.clientWidth / 2;
+    const pieceHeight = grid.clientHeight / 2;
+
+    const shuffled = [...piecesConfig].sort(() => Math.random() - 0.5);
+
+    shuffled.forEach((cfg, i) => {
+      const piece = document.createElement('div');
+      piece.className = 'puzzle-piece';
+      piece.dataset.index = cfg.index;
+      piece.style.width = pieceWidth + 'px';
+      piece.style.height = pieceHeight + 'px';
+      piece.style.backgroundImage = `url("${currentImageUrl}")`;
+      piece.style.backgroundPosition = cfg.bgPos;
+
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      piece.style.left = (390 + col * (pieceWidth + 20)) + 'px';
+      piece.style.top = (15 + row * (pieceHeight + 15)) + 'px';
+
+      enableMagneticDrag(piece);
+      puzzleArea.appendChild(piece);
+    });
+  }
+
+  function enableMagneticDrag(el) {
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+
+    const onDown = (e) => {
+      if (el.classList.contains('locked')) return;
+      isDragging = true;
+      el.classList.add('dragging');
+      el.style.zIndex = 30;
+
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      startX = clientX;
+      startY = clientY;
+      initialLeft = parseFloat(el.style.left);
+      initialTop = parseFloat(el.style.top);
+    };
+
+    const onMove = (e) => {
+      if (!isDragging || el.classList.contains('locked')) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      el.style.left = (initialLeft + clientX - startX) + 'px';
+      el.style.top = (initialTop + clientY - startY) + 'px';
+
+      if (tryMagneticSnap(el)) {
+        isDragging = false;
+        el.classList.remove('dragging');
+      }
+    };
+
+    const onUp = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      el.classList.remove('dragging');
+      el.style.zIndex = 10;
+      tryMagneticSnap(el);
+    };
+
+    el.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+
+    el.addEventListener('touchstart', onDown, { passive: true });
+    window.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchend', onUp);
+  }
+
+  function tryMagneticSnap(piece) {
+    if (piece.classList.contains('locked')) return true;
+
+    const index = piece.dataset.index;
+    const slot = document.querySelector(`.target-slot[data-index="${index}"]`);
+    const pieceRect = piece.getBoundingClientRect();
+    const slotRect = slot.getBoundingClientRect();
+
+    const dist = Math.hypot(
+      pieceRect.left - slotRect.left,
+      pieceRect.top - slotRect.top
+    );
+
+    if (dist < 50) {
+      const containerRect = document.getElementById('puzzleArea').getBoundingClientRect();
+      piece.style.left = (slotRect.left - containerRect.left) + 'px';
+      piece.style.top = (slotRect.top - containerRect.top) + 'px';
+      piece.classList.add('locked');
+
+      score++;
+      document.getElementById('scoreDisplay').innerText = score;
+
+      if (score === 4) {
+        clearInterval(timer);
+        setTimeout(() => {
+          showPage('pageSuccess');
+        }, 400);
+      }
+      return true;
+    }
+    return false;
+  }
+</script>
+
+</body>
+</html>
